@@ -82,8 +82,8 @@ def extract_thumbnails(source_folder: str, output_folder_name: str = "thumbnails
         print(f"エラー: フォルダが存在しません: {source_folder}")
         sys.exit(1)
     
-    # 出力フォルダを作成
-    output_path = source_path / output_folder_name
+    # 出力フォルダを作成（親ディレクトリに作成）
+    output_path = source_path.parent / output_folder_name
     output_path.mkdir(exist_ok=True)
     
     print(f"=== サムネイル抽出 ===")
@@ -129,8 +129,8 @@ def extract_thumbnails(source_folder: str, output_folder_name: str = "thumbnails
 
 
 if __name__ == "__main__":
-    # デフォルトのソースフォルダはスクリプトと同じ場所
-    default_source = Path(__file__).parent
+    # デフォルトのソースフォルダはoriginalsフォルダ
+    default_source = Path(__file__).parent / "originals"
     
     # コマンドライン引数があれば使用
     if len(sys.argv) > 1:
