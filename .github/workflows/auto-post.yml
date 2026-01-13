@@ -10,9 +10,9 @@ on:
   workflow_dispatch:  # 手動実行も可能
 
 env:
-  # Google DriveのフォルダID（公開フォルダ）
-  GDRIVE_THUMBNAILS_FOLDER_ID: "1v47FGjaiJWxFhp9y_9dWanp_wnpHHjG0"
-  GDRIVE_BLURRED_FOLDER_ID: "17tXlu3sB_TbZ_9VTMG7G64SRlkb6cos9"
+  # Google DriveのフォルダID（Secretsから取得）
+  GDRIVE_THUMBNAILS_FOLDER_ID: ${{ secrets.GDRIVE_THUMBNAILS_FOLDER_ID }}
+  GDRIVE_BLURRED_FOLDER_ID: ${{ secrets.GDRIVE_BLURRED_FOLDER_ID }}
 
 jobs:
   post-to-x:
