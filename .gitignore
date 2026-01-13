@@ -1,0 +1,25 @@
+# 環境変数（GitHub Secretsで管理）
+.env
+
+# システムファイル
+desktop.ini
+*.ini
+Thumbs.db
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+
+# 動画・画像ファイル（Google Driveで管理）
+thumbnails/
+blurred/
+*.mp4
+*.png
+*.jpg
+*.jpeg

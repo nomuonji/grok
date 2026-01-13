@@ -1,0 +1,70 @@
+name: X Auto Post
+
+on:
+  schedule:
+    # 裏垢系で反応が良い時間帯（日本時間）
+    # 23:00 JST = 14:00 UTC（夜のリラックスタイム）
+    - cron: '0 14 * * *'
+    # 12:30 JST = 03:30 UTC（昼休み）
+    - cron: '30 3 * * *'
+  workflow_dispatch:  # 手動実行も可能
+
+env:
+  # Google DriveのフォルダID（公開フォルダ）
+  GDRIVE_THUMBNAILS_FOLDER_ID: "1v47FGjaiJWxFhp9y_9dWanp_wnpHHjG0"
+  GDRIVE_BLURRED_FOLDER_ID: "17tXlu3sB_TbZ_9VTMG7G64SRlkb6cos9"
+
+jobs:
+  post-to-x:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install tweepy python-dotenv gdown
+      
+      - name: Download files from Google Drive
+        run: |
+          # サムネイルフォルダをダウンロード
+          gdown --folder "https://drive.google.com/drive/folders/${{ env.GDRIVE_THUMBNAILS_FOLDER_ID }}" -O thumbnails --remaining-ok
+          
+          # ブラー動画フォルダをダウンロード
+          gdown --folder "https://drive.google.com/drive/folders/${{ env.GDRIVE_BLURRED_FOLDER_ID }}" -O blurred --remaining-ok
+          
+          # ダウンロード結果を確認
+          echo "=== Thumbnails ==="
+          ls -la thumbnails/ || echo "No thumbnails found"
+          echo "=== Blurred videos ==="
+          ls -la blurred/ || echo "No blurred videos found"
+      
+      - name: Create .env file from secrets
+        run: |
+          cat << EOF > .env
+          X_API_KEY=${{ secrets.X_API_KEY }}
+          X_API_SECRET=${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN=${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_TOKEN_SECRET=${{ secrets.X_ACCESS_TOKEN_SECRET }}
+          LOCAL_THUMBNAILS_PATH=./thumbnails
+          LOCAL_BLURRED_PATH=./blurred
+          EOF
+      
+      - name: Run post script
+        run: python post_to_x.py
+      
+      - name: Commit status file
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add post_status.json
+          git diff --staged --quiet || git commit -m "Update post status [skip ci]"
+          git push
