@@ -6,58 +6,74 @@ import requests
 import codecs
 from pathlib import Path
 import gdown
+from dotenv import load_dotenv
 
 def get_folder_files_public(folder_id):
     """
     公開フォルダのHTMLをパースしてファイル名とIDのリストを取得する
     """
-    # 複数のURLパターンを試す
     urls = [
         f"https://drive.google.com/embeddedfolderview?id={folder_id}",
         f"https://drive.google.com/drive/folders/{folder_id}"
     ]
     
-    items = []
+    items_dict = {} # 名前をキーにして重複を防ぐ
     for url in urls:
         try:
             print(f"フォルダ情報を取得中: {url}")
             response = requests.get(url, timeout=15, headers={
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.36'
             })
             response.raise_for_status()
             html = response.text
             
-            # デバッグ: HTMLの一部を表示（構造確認用）
-            # print(f"HTML snippet: {html[:500]}...")
-
-            # 改良版正規表現: 
-            # 1. IDは20文字以上の英数ハイフンアンダースコア（ドットを含まない）
-            # 2. 名前はダブルクォートを含まない文字列
+            # --- 抽出パターン1: ["ID", "名前"] ---
             matches = re.findall(r'\["([a-zA-Z0-9_-]{20,})","([^"]+)"', html)
-            
             for file_id, name in matches:
-                # フィルタリング:
-                # - 名前に拡張子（.png, .mp4, .mov 等）が含まれている
-                # - URL（http://...）ではない
-                # - IDにドットが含まれない（ドメイン名除外）
-                if any(ext in name.lower() for ext in ['.png', '.mp4', '.mov', '.jpg', '.jpeg']):
+                name_lower = name.lower()
+                if any(noise in name_lower for noise in ['drive_2020q4', 'branding', 'product', 'logo', 'favicon']):
+                    continue
+                if any(ext in name_lower for ext in ['.png', '.mp4', '.mov', '.jpg']):
                     if not name.startswith('http') and '.' not in file_id:
-                        try:
-                            # Unicodeエスケープの処理
-                            name = codecs.decode(name, 'unicode_escape')
-                        except:
-                            pass
-                        items.append({"id": file_id, "name": name})
-            
-            if items:
-                print(f"  -> {len(items)} 個のファイルを発見しました")
-                break 
+                        try: name = codecs.decode(name, 'unicode_escape')
+                        except: pass
+                        if len(name) > 3:
+                            items_dict[name] = {"id": file_id, "name": name}
+
+            # --- 抽出パターン2: flip-entry (HTML直接パース) ---
+            # id="entry-XXXX" ... >TITLE</div>
+            entry_matches = re.finditer(r'id="entry-([a-zA-Z0-9_-]+)"[^>]*>.*?class="flip-entry-title">([^<]+)</div>', html, re.DOTALL)
+            for m in entry_matches:
+                file_id, name = m.group(1), m.group(2)
+                if any(ext in name.lower() for ext in ['.png', '.mp4', '.mov', '.jpg']):
+                    items_dict[name] = {"id": file_id, "name": name}
+
+            # --- 抽出パターン3: 拡張子から遡ってIDを探す ---
+            for ext in ['.png', '.mp4']:
+                raw_matches = re.finditer(r'"([^"]+' + re.escape(ext) + r')"', html)
+                for m in raw_matches:
+                    name = m.group(1)
+                    if any(noise in name.lower() for noise in ['drive_2020q4', 'branding', 'product']):
+                        continue
+                    start_pos = max(0, m.start() - 500)
+                    chunk = html[start_pos : m.start()]
+                    id_matches = re.findall(r'["\']([a-zA-Z0-9_-]{25,})["\']', chunk)
+                    if id_matches:
+                        file_id = id_matches[-1]
+                        if name not in items_dict:
+                            items_dict[name] = {"id": file_id, "name": name}
+
+            if items_dict:
+                print(f"  -> {len(items_dict)} 個のファイルを発見しました")
+                break
+            else:
+                # 何も見つからない場合のみHTMLの断片を表示
+                print(f"  HTML スニペット (1000文字): {html[:1000]}")
+                
         except Exception as e:
             print(f"警告: {url} からの取得に失敗しました: {e}")
             
-    # 名前で一意にする
-    unique_items = {item['name']: item for item in items}.values()
-    return list(unique_items)
+    return list(items_dict.values())
 
 def download_file(file_id, output_path):
     """gdownを使用して特定のファイルをダウンロード"""
@@ -66,6 +82,9 @@ def download_file(file_id, output_path):
     gdown.download(url, str(output_path), quiet=False)
 
 def main():
+    # .envがあれば読み込む（ローカルテスト用）
+    load_dotenv()
+    
     # 1. ステータスを読み込んで次回の投稿対象を特定
     status_file = Path("post_status.json")
     if not status_file.exists():
