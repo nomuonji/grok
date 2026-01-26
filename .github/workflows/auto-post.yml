@@ -34,17 +34,17 @@ jobs:
       
       - name: Install dependencies
         run: |
-          pip install tweepy python-dotenv gdown
+          pip install tweepy python-dotenv gdown requests
       
-      - name: Download files from Google Drive
+      - name: Download only necessary files from Google Drive
         run: |
-          # サムネイルフォルダをダウンロード
-          gdown --folder "https://drive.google.com/drive/folders/${{ env.GDRIVE_THUMBNAILS_FOLDER_ID }}" -O thumbnails --remaining-ok
-          
-          # ブラー動画フォルダをダウンロード
-          gdown --folder "https://drive.google.com/drive/folders/${{ env.GDRIVE_BLURRED_FOLDER_ID }}" -O blurred --remaining-ok
-          
-          # ダウンロード結果を確認
+          python download_next_post_files.py
+        env:
+          GDRIVE_THUMBNAILS_FOLDER_ID: ${{ secrets.GDRIVE_THUMBNAILS_FOLDER_ID }}
+          GDRIVE_BLURRED_FOLDER_ID: ${{ secrets.GDRIVE_BLURRED_FOLDER_ID }}
+      
+      - name: Check downloaded files
+        run: |
           echo "=== Thumbnails ==="
           ls -la thumbnails/ || echo "No thumbnails found"
           echo "=== Blurred videos ==="
