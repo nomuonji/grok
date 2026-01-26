@@ -37,6 +37,7 @@ def get_folder_files_public(folder_id):
                     try:
                         name = codecs.decode(name, 'unicode_escape')
                     except:
+                        print(f"デコード失敗: {name}")
                         pass
                     items.append({"id": file_id, "name": name})
             
@@ -77,6 +78,16 @@ def main():
     blurred_files = get_folder_files_public(blurred_folder_id)
     
     print(f"サムネイル候補: {len(thumbnail_files)}件, 動画候補: {len(blurred_files)}件")
+    
+    # デバッグ: 取得できたファイル名をいくつか表示
+    if thumbnail_files:
+        print(f"サムネイル例: {[f['name'] for f in thumbnail_files[:5]]}")
+    if blurred_files:
+        print(f"動画例: {[f['name'] for f in blurred_files[:5]]}")
+    
+    # フォルダ作成（常に作成しておくことで後続のエラーを防ぐ）
+    Path("thumbnails").mkdir(exist_ok=True)
+    Path("blurred").mkdir(exist_ok=True)
     
     # 投稿済みの名前セット
     posted_names = set(status.get("posted", []))

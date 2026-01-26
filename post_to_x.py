@@ -101,6 +101,11 @@ def get_file_pairs(thumbnails_path: Path, blurred_path: Path) -> list[dict]:
     """サムネイルとブラー動画のペアを取得"""
     pairs = []
     
+    # パスの存在確認
+    if not thumbnails_path.exists() or not blurred_path.exists():
+        print(f"ディレクトリが見つかりません: {thumbnails_path} または {blurred_path}")
+        return []
+    
     # サムネイルファイルを取得
     thumbnail_files = sorted([f for f in thumbnails_path.iterdir() 
                               if f.is_file() and f.suffix.lower() == ".png"])
