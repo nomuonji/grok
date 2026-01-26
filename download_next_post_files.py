@@ -27,22 +27,31 @@ def get_folder_files_public(folder_id):
             response.raise_for_status()
             html = response.text
             
-            # Google Driveの内部データ構造に含まれるファイル名とIDのペアを探す
-            # パターン 1: ["id", "name"]
+            # デバッグ: HTMLの一部を表示（構造確認用）
+            # print(f"HTML snippet: {html[:500]}...")
+
+            # 改良版正規表現: 
+            # 1. IDは20文字以上の英数ハイフンアンダースコア（ドットを含まない）
+            # 2. 名前はダブルクォートを含まない文字列
             matches = re.findall(r'\["([a-zA-Z0-9_-]{20,})","([^"]+)"', html)
+            
             for file_id, name in matches:
-                # 重複排除とノイズ除去（.js や .css は除外）
-                if len(file_id) > 20 and not any(ext in name for ext in ['.js', '.css', '.html']):
-                    # Unicodeエスケープの処理 (例: \u0028 -> ()
-                    try:
-                        name = codecs.decode(name, 'unicode_escape')
-                    except:
-                        print(f"デコード失敗: {name}")
-                        pass
-                    items.append({"id": file_id, "name": name})
+                # フィルタリング:
+                # - 名前に拡張子（.png, .mp4, .mov 等）が含まれている
+                # - URL（http://...）ではない
+                # - IDにドットが含まれない（ドメイン名除外）
+                if any(ext in name.lower() for ext in ['.png', '.mp4', '.mov', '.jpg', '.jpeg']):
+                    if not name.startswith('http') and '.' not in file_id:
+                        try:
+                            # Unicodeエスケープの処理
+                            name = codecs.decode(name, 'unicode_escape')
+                        except:
+                            pass
+                        items.append({"id": file_id, "name": name})
             
             if items:
-                break # 取得できたら終了
+                print(f"  -> {len(items)} 個のファイルを発見しました")
+                break 
         except Exception as e:
             print(f"警告: {url} からの取得に失敗しました: {e}")
             
