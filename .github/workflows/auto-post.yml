@@ -34,7 +34,7 @@ jobs:
       
       - name: Install dependencies
         run: |
-          pip install tweepy python-dotenv gdown requests
+          pip install tweepy python-dotenv gdown requests Pillow
       
       - name: Download only necessary files from Google Drive
         run: |

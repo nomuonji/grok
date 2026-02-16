@@ -23,6 +23,7 @@ from dotenv import load_dotenv
 import tweepy
 import requests
 from datetime import datetime, timedelta, timezone
+from PIL import Image
 
 # 設定ファイルのパス
 STATUS_FILE = Path(__file__).parent / "post_status.json"
@@ -401,7 +402,7 @@ def post_to_x(client: tweepy.Client, api: tweepy.API,
               thumbnail_path: Path, video_path: Path,
               thumbnail_text: str = "", video_text: str = "") -> dict:
     """
-    サムネイルとブラー動画をXに投稿
+    サムネイルと動画をXに投稿（1つのツイートにまとめる）
     
     Returns:
         投稿結果の辞書
@@ -409,32 +410,26 @@ def post_to_x(client: tweepy.Client, api: tweepy.API,
     result = {}
     
     # 1. サムネイル画像をアップロード
-    print("\n[X 1/4] サムネイル画像をアップロード...")
+    print("\n[X 1/2] メディアをアップロード...")
     thumbnail_media_id = upload_media(api, thumbnail_path, "image")
+    print(f"  画像ID: {thumbnail_media_id}")
     
-    # 2. サムネイル投稿
-    print("[X 2/4] サムネイル投稿...")
-    thumbnail_response = client.create_tweet(
-        text=thumbnail_text,
-        media_ids=[thumbnail_media_id]
-    )
-    thumbnail_tweet_id = thumbnail_response.data["id"]
-    result["thumbnail_tweet_id"] = thumbnail_tweet_id
-    print(f"  ✓ 投稿完了: https://twitter.com/i/status/{thumbnail_tweet_id}")
-    
-    # 3. ブラー動画をアップロード
-    print("[X 3/4] ブラー動画をアップロード...")
+    # 2. 動画をアップロード
     video_media_id = upload_media(api, video_path, "video")
+    print(f"  動画ID: {video_media_id}")
     
-    # 4. リプライとして動画を投稿
-    print("[X 4/4] リプライ投稿...")
-    video_response = client.create_tweet(
-        media_ids=[video_media_id],
-        in_reply_to_tweet_id=thumbnail_tweet_id
+    # 3. まとめて投稿
+    print("[X 2/2] ツイート投稿...")
+    # 画像と動画を同時に添付（Mixed Media）
+    response = client.create_tweet(
+        text=thumbnail_text,
+        media_ids=[thumbnail_media_id, video_media_id]
     )
-    video_tweet_id = video_response.data["id"]
-    result["video_tweet_id"] = video_tweet_id
-    print(f"  ✓ 投稿完了: https://twitter.com/i/status/{video_tweet_id}")
+    tweet_id = response.data["id"]
+    result["tweet_id"] = tweet_id # キー名を統一
+    result["thumbnail_tweet_id"] = tweet_id # 互換性のため残す
+    
+    print(f"  ✓ 投稿完了: https://twitter.com/i/status/{tweet_id}")
     
     return result
 
@@ -473,6 +468,47 @@ def upload_to_imgbb(image_path: Path, api_key: str) -> str:
         return url
     else:
         raise Exception(f"imgBBアップロード失敗: {result}")
+
+
+def resize_image_for_instagram(image_path: Path) -> Path:
+    """
+    Instagramのフィード投稿要件（アスペクト比 4:5 ~ 1.91:1）に合わせて画像を調整
+    縦長すぎる画像（9:16など）は、中央で 4:5 にクロップする
+    """
+    try:
+        with Image.open(image_path) as img:
+            width, height = img.size
+            aspect_ratio = width / height
+            
+            # Instagramの許容アスペクト比
+            MIN_RATIO = 0.8   # 4:5
+            MAX_RATIO = 1.91  # 1.91:1
+            
+            # アスペクト比が範囲内ならそのまま
+            if MIN_RATIO <= aspect_ratio <= MAX_RATIO:
+                return image_path
+                
+            print(f"⚠️ 画像アスペクト比調整: {aspect_ratio:.2f} -> {MIN_RATIO} (Instagram用)")
+            
+            # 縦長すぎる場合（例: 9:16 = 0.56）-> 上下をカットして 4:5 に
+            if aspect_ratio < MIN_RATIO:
+                new_height = int(width / MIN_RATIO)
+                top = (height - new_height) // 2
+                bottom = top + new_height
+                
+                cropped_img = img.crop((0, top, width, bottom))
+                
+                # 一時ファイルとして保存
+                temp_path = image_path.parent / f"ig_temp_{image_path.name}"
+                cropped_img.save(temp_path)
+                return temp_path
+                
+            # 横長すぎる場合 -> 今回は省略（通常縦長動画のサムネなので発生しにくい）
+            return image_path
+            
+    except Exception as e:
+        print(f"警告: 画像リサイズ失敗: {e}")
+        return image_path
 
 
 def post_to_instagram(image_url: str, caption: str, 
@@ -684,23 +720,38 @@ def main():
         has_error = True
     
     # ========== 画像をパブリックURLにアップロード (imgBB) ==========
-    public_image_url = None
-    if can_post_instagram(config) or can_post_threads(config):
+    # InstagramとThreadsの仕様に合わせて、それぞれ最適な画像をアップロードする
+    ig_image_url = None
+    th_image_url = None
+    
+    # Instagram用画像準備
+    if can_post_instagram(config):
         try:
-            print("\n" + "=" * 50)
-            print("🖼️ imgBBに画像をアップロード中...")
-            print("=" * 50)
+            # アスペクト比調整
+            ig_image_path = resize_image_for_instagram(next_pair['thumbnail'])
+            ig_image_url = upload_to_imgbb(ig_image_path, config["imgbb_api_key"])
             
-            public_image_url = upload_to_imgbb(
-                next_pair["thumbnail"],
-                config["imgbb_api_key"]
-            )
+            # 一時ファイルなら削除
+            if ig_image_path != next_pair['thumbnail']:
+                try:
+                    os.remove(ig_image_path)
+                except:
+                    pass
         except Exception as e:
-            print(f"\n✗ imgBBアップロードエラー: {e}")
-            print("  Instagram/Threadsへの投稿をスキップします。")
+            print(f"Instagram用画像準備エラー: {e}")
+    
+    # Threads用画像準備（元の縦長画像でOK）
+    if can_post_threads(config):
+        if ig_image_url and next_pair['thumbnail'] == resize_image_for_instagram(next_pair['thumbnail']):
+             th_image_url = ig_image_url # 同じで良ければ再利用
+        else:
+            try:
+                th_image_url = upload_to_imgbb(next_pair['thumbnail'], config["imgbb_api_key"])
+            except Exception as e:
+                print(f"Threads用画像準備エラー: {e}")
     
     # ========== Instagram ==========
-    if can_post_instagram(config) and public_image_url:
+    if can_post_instagram(config) and ig_image_url:
         try:
             print("\n" + "=" * 50)
             print("📷 Instagram に投稿中...")
@@ -710,7 +761,7 @@ def main():
             ig_caption = f"{post_text}\n\n#裏垢女子 #AI美女 #AIグラビア"
             
             ig_media_id = post_to_instagram(
-                image_url=public_image_url,
+                image_url=ig_image_url,
                 caption=ig_caption,
                 user_id=config["instagram_user_id"],
                 access_token=config["instagram_access_token"]
@@ -725,14 +776,14 @@ def main():
             print(f"\n✗ Instagramエラー: {e}")
     
     # ========== Threads ==========
-    if can_post_threads(config) and public_image_url:
+    if can_post_threads(config) and th_image_url:
         try:
             print("\n" + "=" * 50)
             print("🧵 Threads に投稿中...")
             print("=" * 50)
             
             threads_media_id = post_to_threads(
-                image_url=public_image_url,
+                image_url=th_image_url,
                 text=post_text,
                 user_id=config["threads_user_id"],
                 access_token=config["threads_access_token"]
