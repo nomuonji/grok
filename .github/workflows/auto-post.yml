@@ -41,14 +41,14 @@ jobs:
           python download_next_post_files.py
         env:
           GDRIVE_THUMBNAILS_FOLDER_ID: ${{ secrets.GDRIVE_THUMBNAILS_FOLDER_ID }}
-          GDRIVE_BLURRED_FOLDER_ID: ${{ secrets.GDRIVE_BLURRED_FOLDER_ID }}
+          GDRIVE_ORIGINALS_FOLDER_ID: ${{ secrets.GDRIVE_ORIGINALS_FOLDER_ID }}
       
       - name: Check downloaded files
         run: |
           echo "=== Thumbnails ==="
           ls -la thumbnails/ || echo "No thumbnails found"
-          echo "=== Blurred videos ==="
-          ls -la blurred/ || echo "No blurred videos found"
+          echo "=== Original videos ==="
+          ls -la originals/ || echo "No original videos found"
       
       - name: Create .env file from secrets
         run: |

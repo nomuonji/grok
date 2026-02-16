@@ -95,44 +95,44 @@ def main():
         status = json.load(f)
     
     thumbnails_folder_id = os.getenv("GDRIVE_THUMBNAILS_FOLDER_ID")
-    blurred_folder_id = os.getenv("GDRIVE_BLURRED_FOLDER_ID")
+    originals_folder_id = os.getenv("GDRIVE_ORIGINALS_FOLDER_ID")
     
-    if not thumbnails_folder_id or not blurred_folder_id:
-        print("エラー: 環境変数 GDRIVE_THUMBNAILS_FOLDER_ID または GDRIVE_BLURRED_FOLDER_ID が設定されていません。")
+    if not thumbnails_folder_id or not originals_folder_id:
+        print("エラー: 環境変数 GDRIVE_THUMBNAILS_FOLDER_ID または GDRIVE_ORIGINALS_FOLDER_ID が設定されていません。")
         sys.exit(1)
         
     print("Google Drive からファイルリストを取得中...")
     thumbnail_files = get_folder_files_public(thumbnails_folder_id)
-    blurred_files = get_folder_files_public(blurred_folder_id)
+    originals_files = get_folder_files_public(originals_folder_id)
     
-    print(f"サムネイル候補: {len(thumbnail_files)}件, 動画候補: {len(blurred_files)}件")
+    print(f"サムネイル候補: {len(thumbnail_files)}件, 動画候補: {len(originals_files)}件")
     
     # デバッグ: 取得できたファイル名をいくつか表示
     if thumbnail_files:
         print(f"サムネイル例: {[f['name'] for f in thumbnail_files[:5]]}")
-    if blurred_files:
-        print(f"動画例: {[f['name'] for f in blurred_files[:5]]}")
+    if originals_files:
+        print(f"動画例: {[f['name'] for f in originals_files[:5]]}")
     
     # フォルダ作成（常に作成しておくことで後続のエラーを防ぐ）
     Path("thumbnails").mkdir(exist_ok=True)
-    Path("blurred").mkdir(exist_ok=True)
+    Path("originals").mkdir(exist_ok=True)
     
     # 投稿済みの名前セット
     posted_names = set(status.get("posted", []))
     
     # ペアを組む
     pairs = []
-    blurred_map = {Path(f["name"]).stem: f["id"] for f in blurred_files if f["name"].endswith(".mp4")}
+    originals_map = {Path(f["name"]).stem: f["id"] for f in originals_files if f["name"].endswith(".mp4")}
     
     for thumb in thumbnail_files:
         if not thumb["name"].endswith(".png"):
             continue
         name = Path(thumb["name"]).stem
-        if name in blurred_map and name not in posted_names:
+        if name in originals_map and name not in posted_names:
             pairs.append({
                 "name": name,
                 "thumb_id": thumb["id"],
-                "video_id": blurred_map[name]
+                "video_id": originals_map[name]
             })
     
     # 名前でソート（一貫性のため）
@@ -148,12 +148,12 @@ def main():
     
     # フォルダ作成
     Path("thumbnails").mkdir(exist_ok=True)
-    Path("blurred").mkdir(exist_ok=True)
+    Path("originals").mkdir(exist_ok=True)
     
     # ダウンロード実行
     try:
         download_file(next_pair["thumb_id"], Path("thumbnails") / f"{next_pair['name']}.png")
-        download_file(next_pair["video_id"], Path("blurred") / f"{next_pair['name']}.mp4")
+        download_file(next_pair["video_id"], Path("originals") / f"{next_pair['name']}.mp4")
         print("\n必要なファイルのダウンロードが完了しました。")
     except Exception as e:
         print(f"\nダウンロード中にエラーが発生しました: {e}")
