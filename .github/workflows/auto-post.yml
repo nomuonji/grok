@@ -1,4 +1,4 @@
-name: X Auto Post
+name: SNS Auto Post (X / Instagram / Threads)
 
 on:
   schedule:
@@ -18,7 +18,7 @@ permissions:
   contents: write
 
 jobs:
-  post-to-x:
+  post-to-sns:
     runs-on: ubuntu-latest
     
     steps:
@@ -58,7 +58,12 @@ jobs:
           X_ACCESS_TOKEN=${{ secrets.X_ACCESS_TOKEN }}
           X_ACCESS_TOKEN_SECRET=${{ secrets.X_ACCESS_TOKEN_SECRET }}
           LOCAL_THUMBNAILS_PATH=./thumbnails
-          LOCAL_BLURRED_PATH=./blurred
+          LOCAL_ORIGINALS_PATH=./originals
+          INSTAGRAM_USER_ID=${{ secrets.INSTAGRAM_USER_ID }}
+          INSTAGRAM_ACCESS_TOKEN=${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          THREADS_USER_ID=${{ secrets.THREADS_USER_ID }}
+          THREADS_ACCESS_TOKEN=${{ secrets.THREADS_ACCESS_TOKEN }}
+          IMGBB_API_KEY=${{ secrets.IMGBB_API_KEY }}
           EOF
       
       - name: Run post script

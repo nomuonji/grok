@@ -1,12 +1,14 @@
 """
-X (Twitter) 投稿スクリプト
+X (Twitter) / Instagram / Threads 投稿スクリプト
 
 このスクリプトは、サムネイル画像とブラー処理済み動画を
-X (Twitter) に投稿します。
+X (Twitter) に投稿し、同じサムネイル画像を
+Instagram と Threads にも投稿します。
 
 機能:
-- サムネイル画像を投稿
-- その投稿へのリプライとしてブラー動画を投稿
+- サムネイル画像をXに投稿（+ リプライとしてブラー動画を投稿）
+- サムネイル画像をInstagramに投稿（画像のみ）
+- サムネイル画像をThreadsに投稿（画像+テキスト）
 - ステータスファイルで投稿済みを管理
 - 一度の実行で1セットを投稿
 """
@@ -15,9 +17,11 @@ import json
 import os
 import sys
 import time
+import base64
 from pathlib import Path
 from dotenv import load_dotenv
 import tweepy
+import requests
 
 
 # 設定ファイルのパス
@@ -30,13 +34,14 @@ def load_env():
     env_path = Path(__file__).parent / ".env"
     load_dotenv(env_path)
     
+    # X (Twitter) は必須
     required_vars = [
         "X_API_KEY",
         "X_API_SECRET", 
         "X_ACCESS_TOKEN",
         "X_ACCESS_TOKEN_SECRET",
         "LOCAL_THUMBNAILS_PATH",
-        "LOCAL_BLURRED_PATH"
+        "LOCAL_ORIGINALS_PATH"
     ]
     
     missing = [var for var in required_vars if not os.getenv(var) or os.getenv(var).startswith("your_")]
@@ -48,15 +53,28 @@ def load_env():
         print("\n.envファイルを編集してください。")
         sys.exit(1)
     
-    return {
+    config = {
         "api_key": os.getenv("X_API_KEY"),
         "api_secret": os.getenv("X_API_SECRET"),
         "access_token": os.getenv("X_ACCESS_TOKEN"),
         "access_token_secret": os.getenv("X_ACCESS_TOKEN_SECRET"),
         "bearer_token": os.getenv("X_BEARER_TOKEN"),
         "thumbnails_path": Path(os.getenv("LOCAL_THUMBNAILS_PATH")),
-        "blurred_path": Path(os.getenv("LOCAL_BLURRED_PATH"))
+        "originals_path": Path(os.getenv("LOCAL_ORIGINALS_PATH")),
     }
+    
+    # Instagram (任意)
+    config["instagram_user_id"] = os.getenv("INSTAGRAM_USER_ID")
+    config["instagram_access_token"] = os.getenv("INSTAGRAM_ACCESS_TOKEN")
+    
+    # Threads (任意)
+    config["threads_user_id"] = os.getenv("THREADS_USER_ID")
+    config["threads_access_token"] = os.getenv("THREADS_ACCESS_TOKEN")
+    
+    # imgBB (Instagram/Threads使用時に必要)
+    config["imgbb_api_key"] = os.getenv("IMGBB_API_KEY")
+    
+    return config
 
 
 def get_twitter_client(config: dict) -> tuple[tweepy.Client, tweepy.API]:
@@ -97,13 +115,13 @@ def save_status(status: dict):
         json.dump(status, f, ensure_ascii=False, indent=2)
 
 
-def get_file_pairs(thumbnails_path: Path, blurred_path: Path) -> list[dict]:
-    """サムネイルとブラー動画のペアを取得"""
+def get_file_pairs(thumbnails_path: Path, originals_path: Path) -> list[dict]:
+    """サムネイルとオリジナル動画のペアを取得"""
     pairs = []
     
     # パスの存在確認
-    if not thumbnails_path.exists() or not blurred_path.exists():
-        print(f"ディレクトリが見つかりません: {thumbnails_path} または {blurred_path}")
+    if not thumbnails_path.exists() or not originals_path.exists():
+        print(f"ディレクトリが見つかりません: {thumbnails_path} または {originals_path}")
         return []
     
     # サムネイルファイルを取得
@@ -111,9 +129,9 @@ def get_file_pairs(thumbnails_path: Path, blurred_path: Path) -> list[dict]:
                               if f.is_file() and f.suffix.lower() == ".png"])
     
     for thumbnail in thumbnail_files:
-        # 対応するブラー動画を探す
+        # 対応するオリジナル動画を探す
         video_name = thumbnail.stem + ".mp4"
-        video_path = blurred_path / video_name
+        video_path = originals_path / video_name
         
         if video_path.exists():
             pairs.append({
@@ -199,11 +217,11 @@ def post_to_x(client: tweepy.Client, api: tweepy.API,
     result = {}
     
     # 1. サムネイル画像をアップロード
-    print("\n[1/4] サムネイル画像をアップロード...")
+    print("\n[X 1/4] サムネイル画像をアップロード...")
     thumbnail_media_id = upload_media(api, thumbnail_path, "image")
     
     # 2. サムネイル投稿
-    print("[2/4] サムネイル投稿...")
+    print("[X 2/4] サムネイル投稿...")
     thumbnail_response = client.create_tweet(
         text=thumbnail_text,
         media_ids=[thumbnail_media_id]
@@ -213,11 +231,11 @@ def post_to_x(client: tweepy.Client, api: tweepy.API,
     print(f"  ✓ 投稿完了: https://twitter.com/i/status/{thumbnail_tweet_id}")
     
     # 3. ブラー動画をアップロード
-    print("[3/4] ブラー動画をアップロード...")
+    print("[X 3/4] ブラー動画をアップロード...")
     video_media_id = upload_media(api, video_path, "video")
     
     # 4. リプライとして動画を投稿
-    print("[4/4] リプライ投稿...")
+    print("[X 4/4] リプライ投稿...")
     video_response = client.create_tweet(
         media_ids=[video_media_id],
         in_reply_to_tweet_id=thumbnail_tweet_id
@@ -229,18 +247,191 @@ def post_to_x(client: tweepy.Client, api: tweepy.API,
     return result
 
 
+# ============================================================
+# imgBB / Instagram / Threads
+# ============================================================
+
+def upload_to_imgbb(image_path: Path, api_key: str) -> str:
+    """
+    画像をimgBBにアップロードしてパブリックURLを取得
+    
+    Returns:
+        画像のパブリックURL
+    """
+    print(f"\n[imgBB] 画像をアップロード中: {image_path.name}")
+    
+    with open(image_path, "rb") as f:
+        image_data = base64.b64encode(f.read()).decode("utf-8")
+    
+    response = requests.post(
+        "https://api.imgbb.com/1/upload",
+        data={
+            "key": api_key,
+            "image": image_data,
+            "name": image_path.stem
+        },
+        timeout=60
+    )
+    response.raise_for_status()
+    result = response.json()
+    
+    if result.get("success"):
+        url = result["data"]["url"]
+        print(f"  ✓ アップロード完了: {url}")
+        return url
+    else:
+        raise Exception(f"imgBBアップロード失敗: {result}")
+
+
+def post_to_instagram(image_url: str, caption: str, 
+                      user_id: str, access_token: str) -> str:
+    """
+    Instagramに画像を投稿
+    
+    Args:
+        image_url: パブリックな画像URL
+        caption: 投稿キャプション
+        user_id: InstagramユーザーID
+        access_token: Instagramアクセストークン
+    
+    Returns:
+        投稿のメディアID
+    """
+    api_version = "v22.0"
+    base_url = f"https://graph.instagram.com/{api_version}"
+    
+    # Step 1: メディアコンテナを作成
+    print("\n[Instagram 1/2] メディアコンテナを作成中...")
+    response = requests.post(
+        f"{base_url}/{user_id}/media",
+        data={
+            "image_url": image_url,
+            "caption": caption,
+            "access_token": access_token
+        },
+        timeout=60
+    )
+    response.raise_for_status()
+    container_id = response.json()["id"]
+    print(f"  ✓ コンテナ作成完了: {container_id}")
+    
+    # 処理完了を待つ
+    print("[Instagram] 画像処理中（10秒待機）...")
+    time.sleep(10)
+    
+    # Step 2: 公開
+    print("[Instagram 2/2] 投稿を公開中...")
+    response = requests.post(
+        f"{base_url}/{user_id}/media_publish",
+        data={
+            "creation_id": container_id,
+            "access_token": access_token
+        },
+        timeout=60
+    )
+    response.raise_for_status()
+    media_id = response.json()["id"]
+    print(f"  ✓ Instagram投稿完了: media_id={media_id}")
+    
+    return media_id
+
+
+def post_to_threads(image_url: str, text: str,
+                    user_id: str, access_token: str) -> str:
+    """
+    Threadsに画像を投稿
+    
+    Args:
+        image_url: パブリックな画像URL
+        text: 投稿テキスト
+        user_id: ThreadsユーザーID  
+        access_token: Threadsアクセストークン
+    
+    Returns:
+        投稿のメディアID
+    """
+    base_url = "https://graph.threads.net/v1.0"
+    
+    # Step 1: メディアコンテナを作成
+    print("\n[Threads 1/2] メディアコンテナを作成中...")
+    response = requests.post(
+        f"{base_url}/{user_id}/threads",
+        data={
+            "media_type": "IMAGE",
+            "image_url": image_url,
+            "text": text,
+            "access_token": access_token
+        },
+        timeout=60
+    )
+    response.raise_for_status()
+    container_id = response.json()["id"]
+    print(f"  ✓ コンテナ作成完了: {container_id}")
+    
+    # Metaのサーバーが処理する時間を確保（公式推奨: 30秒）
+    print("[Threads] 画像処理中（30秒待機）...")
+    time.sleep(30)
+    
+    # Step 2: 公開
+    print("[Threads 2/2] 投稿を公開中...")
+    response = requests.post(
+        f"{base_url}/{user_id}/threads_publish",
+        data={
+            "creation_id": container_id,
+            "access_token": access_token
+        },
+        timeout=60
+    )
+    response.raise_for_status()
+    media_id = response.json()["id"]
+    print(f"  ✓ Threads投稿完了: media_id={media_id}")
+    
+    return media_id
+
+
+def can_post_instagram(config: dict) -> bool:
+    """Instagram投稿が可能かチェック"""
+    return bool(
+        config.get("instagram_user_id") 
+        and config.get("instagram_access_token")
+        and config.get("imgbb_api_key")
+    )
+
+
+def can_post_threads(config: dict) -> bool:
+    """Threads投稿が可能かチェック"""
+    return bool(
+        config.get("threads_user_id")
+        and config.get("threads_access_token")
+        and config.get("imgbb_api_key")
+    )
+
+
 def main():
     """メイン処理"""
-    print("=== X投稿スクリプト ===\n")
+    print("=== SNS投稿スクリプト (X / Instagram / Threads) ===\n")
     
     # 環境変数を読み込み
     config = load_env()
+    
+    # 投稿可能なプラットフォームを表示
+    platforms = ["X"]
+    if can_post_instagram(config):
+        platforms.append("Instagram")
+    else:
+        print("ℹ️ Instagram: 認証情報未設定のためスキップ")
+    if can_post_threads(config):
+        platforms.append("Threads")
+    else:
+        print("ℹ️ Threads: 認証情報未設定のためスキップ")
+    
+    print(f"投稿先: {', '.join(platforms)}\n")
     
     # ステータスを読み込み
     status = load_status()
     
     # ファイルペアを取得
-    pairs = get_file_pairs(config["thumbnails_path"], config["blurred_path"])
+    pairs = get_file_pairs(config["thumbnails_path"], config["originals_path"])
     
     if not pairs:
         print("エラー: 投稿可能なファイルペアが見つかりません。")
@@ -272,33 +463,118 @@ def main():
     post_text, text_index = get_next_text(texts, status)
     print(f"投稿テキスト: {post_text}")
     
+    # 各プラットフォームの投稿結果を記録
+    results = {}
+    has_error = False
+    
+    # ========== X (Twitter) ==========
     try:
-        # Twitter APIクライアントを作成
+        print("\n" + "=" * 50)
+        print("📘 X (Twitter) に投稿中...")
+        print("=" * 50)
+        
         client, api = get_twitter_client(config)
         
-        # 投稿実行
-        result = post_to_x(
+        x_result = post_to_x(
             client, api,
             next_pair["thumbnail"],
             next_pair["video"],
             thumbnail_text=post_text,
-            video_text=""  # ブラー動画はテキストなし
+            video_text=""
         )
-        
-        # ステータスを更新
-        status["posted"].append(next_pair["name"])
-        status["current_index"] = len(status["posted"])
-        status["text_index"] = (text_index + 1) % len(texts)  # 次のテキストへ
-        save_status(status)
-        
-        print(f"\n=== 投稿完了 ===")
-        print(f"進捗: {len(status['posted'])}/{len(pairs)} セット投稿済み")
+        results["x"] = x_result
         
     except tweepy.TweepyException as e:
-        print(f"\n✗ Twitter APIエラー: {e}")
-        sys.exit(1)
+        print(f"\n✗ X APIエラー: {e}")
+        has_error = True
     except Exception as e:
-        print(f"\n✗ エラー: {e}")
+        print(f"\n✗ Xエラー: {e}")
+        has_error = True
+    
+    # ========== 画像をパブリックURLにアップロード (imgBB) ==========
+    public_image_url = None
+    if can_post_instagram(config) or can_post_threads(config):
+        try:
+            print("\n" + "=" * 50)
+            print("🖼️ imgBBに画像をアップロード中...")
+            print("=" * 50)
+            
+            public_image_url = upload_to_imgbb(
+                next_pair["thumbnail"],
+                config["imgbb_api_key"]
+            )
+        except Exception as e:
+            print(f"\n✗ imgBBアップロードエラー: {e}")
+            print("  Instagram/Threadsへの投稿をスキップします。")
+    
+    # ========== Instagram ==========
+    if can_post_instagram(config) and public_image_url:
+        try:
+            print("\n" + "=" * 50)
+            print("📷 Instagram に投稿中...")
+            print("=" * 50)
+            
+            # Instagram用キャプション: テキスト + ハッシュタグ（3個まで）
+            ig_caption = f"{post_text}\n\n#裏垢女子 #AI美女 #AIグラビア"
+            
+            ig_media_id = post_to_instagram(
+                image_url=public_image_url,
+                caption=ig_caption,
+                user_id=config["instagram_user_id"],
+                access_token=config["instagram_access_token"]
+            )
+            results["instagram"] = {"media_id": ig_media_id}
+            
+        except requests.exceptions.HTTPError as e:
+            print(f"\n✗ Instagram APIエラー: {e}")
+            if e.response is not None:
+                print(f"  レスポンス: {e.response.text}")
+        except Exception as e:
+            print(f"\n✗ Instagramエラー: {e}")
+    
+    # ========== Threads ==========
+    if can_post_threads(config) and public_image_url:
+        try:
+            print("\n" + "=" * 50)
+            print("🧵 Threads に投稿中...")
+            print("=" * 50)
+            
+            threads_media_id = post_to_threads(
+                image_url=public_image_url,
+                text=post_text,
+                user_id=config["threads_user_id"],
+                access_token=config["threads_access_token"]
+            )
+            results["threads"] = {"media_id": threads_media_id}
+            
+        except requests.exceptions.HTTPError as e:
+            print(f"\n✗ Threads APIエラー: {e}")
+            if e.response is not None:
+                print(f"  レスポンス: {e.response.text}")
+        except Exception as e:
+            print(f"\n✗ Threadsエラー: {e}")
+    
+    # ========== ステータス更新 ==========
+    # X投稿が成功していれば（または少なくとも1つ成功していれば）ステータスを更新
+    if results:
+        status["posted"].append(next_pair["name"])
+        status["current_index"] = len(status["posted"])
+        status["text_index"] = (text_index + 1) % len(texts)
+        save_status(status)
+        
+        print(f"\n{'=' * 50}")
+        print(f"=== 投稿完了 ===")
+        print(f"{'=' * 50}")
+        print(f"進捗: {len(status['posted'])}/{len(pairs)} セット投稿済み")
+        print(f"\n投稿結果:")
+        if "x" in results:
+            print(f"  ✓ X: https://twitter.com/i/status/{results['x']['thumbnail_tweet_id']}")
+        if "instagram" in results:
+            print(f"  ✓ Instagram: media_id={results['instagram']['media_id']}")
+        if "threads" in results:
+            print(f"  ✓ Threads: media_id={results['threads']['media_id']}")
+    else:
+        print(f"\n✗ 全てのプラットフォームへの投稿に失敗しました。")
         sys.exit(1)
 
 
