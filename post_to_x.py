@@ -22,11 +22,12 @@ from pathlib import Path
 from dotenv import load_dotenv
 import tweepy
 import requests
-
+from datetime import datetime, timedelta, timezone
 
 # 設定ファイルのパス
 STATUS_FILE = Path(__file__).parent / "post_status.json"
 TEXTS_FILE = Path(__file__).parent / "post_texts.txt"
+# META_TOKENS_FILE は Gist管理にするため削除
 
 
 def load_env():
@@ -73,8 +74,199 @@ def load_env():
     
     # imgBB (Instagram/Threads使用時に必要)
     config["imgbb_api_key"] = os.getenv("IMGBB_API_KEY")
-    
+
+    # Gist (トークン管理用)
+    config["gist_id"] = os.getenv("GIST_ID")
+    config["gist_token"] = os.getenv("GIST_TOKEN")
+
+    # Gistからトークンを読み込み
+    if config["gist_id"] and config["gist_token"]:
+        meta_tokens = load_tokens_from_gist(config["gist_id"], config["gist_token"])
+        
+        if meta_tokens:
+            try:
+                updated = False
+                
+                # Instagramトークン処理
+                if "instagram" in meta_tokens:
+                    ig_data = meta_tokens["instagram"]
+                    # user_id はローカル.envを優先（Gistに書かないため）
+                    
+                    # リフレッシュチェック
+                    new_token = check_and_refresh_token(
+                        "instagram", 
+                        ig_data.get("access_token"), 
+                        ig_data.get("expires_at")
+                    )
+                    if new_token:
+                        config["instagram_access_token"] = new_token
+                        # ファイル更新用データ
+                        meta_tokens["instagram"]["access_token"] = new_token
+                        meta_tokens["instagram"]["updated_at"] = datetime.now(timezone(timedelta(hours=9))).isoformat()
+                        # 有効期限を更新（60日後）
+                        meta_tokens["instagram"]["expires_at"] = (datetime.now(timezone(timedelta(hours=9))) + timedelta(days=60)).isoformat()
+                        updated = True
+                    else:
+                        config["instagram_access_token"] = ig_data.get("access_token", config["instagram_access_token"])
+
+                # Threadsトークン処理
+                if "threads" in meta_tokens:
+                    th_data = meta_tokens["threads"]
+                    # user_id はローカル.envを優先
+                    
+                    # リフレッシュチェック
+                    new_token = check_and_refresh_token(
+                        "threads", 
+                        th_data.get("access_token"), 
+                        th_data.get("expires_at")
+                    )
+                    if new_token:
+                        config["threads_access_token"] = new_token
+                        meta_tokens["threads"]["access_token"] = new_token
+                        meta_tokens["threads"]["updated_at"] = datetime.now(timezone(timedelta(hours=9))).isoformat()
+                        meta_tokens["threads"]["expires_at"] = (datetime.now(timezone(timedelta(hours=9))) + timedelta(days=60)).isoformat()
+                        updated = True
+                    else:
+                        config["threads_access_token"] = th_data.get("access_token", config["threads_access_token"])
+                
+                # 更新があればGistに保存
+                if updated:
+                    save_tokens_to_gist(meta_tokens, config["gist_id"], config["gist_token"])
+                    
+            except Exception as e:
+                print(f"警告: トークンデータの更新処理に失敗しました: {e}")
+    else:
+        print("ℹ️ Gist設定が見つからないため、トークン自動更新機能はスキップします。")
+            
     return config
+
+
+def load_tokens_from_gist(gist_id: str, token: str) -> dict | None:
+    """GistからトークンJSONを読み込む"""
+    try:
+        url = f"https://api.github.com/gists/{gist_id}"
+        headers = {
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github.v3+json"
+        }
+        res = requests.get(url, headers=headers, timeout=30)
+        res.raise_for_status()
+        
+        data = res.json()
+        files = data.get("files", {})
+        
+        if "grok_meta_tokens.json" in files:
+            content = files["grok_meta_tokens.json"]["content"]
+            return json.loads(content)
+        
+        print("警告: grok_meta_tokens.json がGistに見つかりません")
+        return None
+        
+    except Exception as e:
+        print(f"警告: Gist読み込みエラー: {e}")
+        return None
+
+
+def save_tokens_to_gist(tokens: dict, gist_id: str, token: str):
+    """GistにトークンJSONを保存"""
+    print("💾 Gistのトークン情報を更新中...")
+    try:
+        url = f"https://api.github.com/gists/{gist_id}"
+        headers = {
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github.v3+json"
+        }
+        
+        payload = {
+            "files": {
+                "grok_meta_tokens.json": {
+                    "content": json.dumps(tokens, indent=2, ensure_ascii=False)
+                }
+            }
+        }
+        
+        res = requests.patch(url, headers=headers, json=payload, timeout=30)
+        res.raise_for_status()
+        print("  ✓ Gistを更新しました")
+        
+    except Exception as e:
+        print(f"  ✗ Gist更新エラー: {e}")
+
+
+def check_and_refresh_token(platform: str, current_token: str, expires_at_str: str) -> str | None:
+    """
+    トークンの有効期限をチェックし、期限が近い場合はリフレッシュする
+    Returns: 新しいトークン (更新なしの場合は None)
+    """
+    if not current_token:
+        return None
+        
+    should_refresh = False
+    
+    if not expires_at_str:
+        should_refresh = True
+    else:
+        try:
+            # ISOフォーマットパース
+            expires_at = datetime.fromisoformat(expires_at_str)
+            now = datetime.now(expires_at.tzinfo)
+            days_left = (expires_at - now).days
+            
+            # 残り7日未満なら更新
+            if days_left < 7:
+                print(f"ℹ️ {platform} トークンの有効期限が残り {days_left} 日です。リフレッシュを試みます。")
+                should_refresh = True
+            else:
+                # print(f"  {platform} トークン有効期限: あと {days_left} 日")
+                pass
+        except ValueError:
+            should_refresh = True
+            
+    if should_refresh:
+        return refresh_access_token_api(platform, current_token)
+    
+    return None
+
+
+def refresh_access_token_api(platform: str, token: str) -> str | None:
+    """APIを叩いてトークンをリフレッシュ"""
+    print(f"🔄 {platform} トークンをリフレッシュ中...")
+    
+    try:
+        url = ""
+        params = {
+            "grant_type": "ig_refresh_token", # Threadsも基本はこれだが、th_refresh_tokenの場合も考慮
+            "access_token": token
+        }
+        
+        if platform == "instagram":
+            url = "https://graph.instagram.com/refresh_access_token"
+        elif platform == "threads":
+            url = "https://graph.threads.net/refresh_access_token"
+            # Threadsは th_refresh_token の可能性があるため、エラーなら再試行するロジックを入れても良いが
+            # 現状は ig_refresh_token で試行。
+            
+        res = requests.get(url, params=params, timeout=30)
+        
+        if res.status_code != 200:
+            # Threadsの場合、th_refresh_tokenを試す
+            if platform == "threads":
+                params["grant_type"] = "th_refresh_token"
+                res = requests.get(url, params=params, timeout=30)
+        
+        if res.status_code == 200:
+            data = res.json()
+            new_token = data.get("access_token")
+            if new_token:
+                print(f"  ✓ {platform} トークンリフレッシュ成功")
+                return new_token
+        
+        print(f"  ✗ リフレッシュ失敗: {res.text}")
+        return None
+        
+    except Exception as e:
+        print(f"  ✗ リフレッシュ例外: {e}")
+        return None
 
 
 def get_twitter_client(config: dict) -> tuple[tweepy.Client, tweepy.API]:
