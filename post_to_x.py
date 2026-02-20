@@ -628,19 +628,33 @@ def post_to_threads(image_url: str, text: str,
     
     # Step 1: メディアコンテナを作成
     print("\n[Threads 1/2] メディアコンテナを作成中...")
-    response = requests.post(
-        f"{base_url}/{user_id}/threads",
-        data={
-            "media_type": "IMAGE",
-            "image_url": image_url,
-            "text": text,
-            "access_token": access_token
-        },
-        timeout=60
-    )
-    response.raise_for_status()
-    container_id = response.json()["id"]
-    print(f"  ✓ コンテナ作成完了: {container_id}")
+    
+    max_retries = 3
+    container_id = None
+    
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(
+                f"{base_url}/{user_id}/threads",
+                data={
+                    "media_type": "IMAGE",
+                    "image_url": image_url,
+                    "text": text,
+                    "access_token": access_token
+                },
+                timeout=60
+            )
+            response.raise_for_status()
+            container_id = response.json()["id"]
+            print(f"  ✓ コンテナ作成完了: {container_id}")
+            break
+        except requests.exceptions.RequestException as e:
+            if attempt < max_retries - 1:
+                print(f"  ✗ コンテナ作成タイムアウト/エラー (試行 {attempt+1}): {e}. 10秒後に再試行します...")
+                time.sleep(10)
+            else:
+                raise
+
     
     # Metaのサーバーが処理する時間を確保（公式推奨: 30秒）
     print("[Threads] 画像処理中（30秒待機）...")
@@ -869,7 +883,7 @@ def main():
     if results:
         status["posted"].append(next_pair["name"])
         status["current_index"] = len(status["posted"])
-        status["text_index"] = (text_index + 1) % len(texts)
+        status["text_index"] = (text_index + 1) % len(texts_fallback)
         save_status(status)
         
         # tweets.json に追加 (Xのみ)
