@@ -66,6 +66,7 @@ jobs:
           IMGBB_API_KEY=${{ secrets.IMGBB_API_KEY }}
           GIST_ID=${{ secrets.GIST_ID }}
           GIST_TOKEN=${{ secrets.GIST_TOKEN }}
+          GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
           EOF
       
       - name: Run post script

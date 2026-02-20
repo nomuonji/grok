@@ -1,0 +1,426 @@
+# Post text stock (English version for Community posts)
+# One text per line, used in order
+# Empty lines and comment lines (starting with #) are ignored
+
+# --- Basic teasing ---
+Took another one today💕
+Anyone wanna see...?🥺
+Showing just a little🙈
+Don't tell anyone...💋
+How do I look today?✨
+Secret photoshoot💕
+Was bored so I took some pics📸
+Like this and maybe I'll show more...?💕
+Treat yourself time✨
+Show me some love and I'll reveal more💋
+A little reward for myself📸
+Posting with butterflies in my stomach...💕
+Embarrassing but want you to see🥺
+You like this kind of thing...?💕
+Sneaky post💋
+For curious eyes only👀
+A secret shot✨
+Went a little bold🙈
+Thanks for watching💕
+Waiting for your reaction...💋
+Showing this just for you💕
+Thanks for the love💕 more in the replies...
+Heart-pounding post💕
+Uploaded on the low📸
+Best shot✨
+Enjoy this with your evening💕
+A bold moment💋
+Thanks for finding me💕
+Sharing a secret...🙈
+Wanna see?💕
+
+# --- Questions & reactions ---
+What do you think...?💕
+Am I your type?🥺
+Did you like it?✨
+Anyone want more?💋
+Your reactions make me happy💕
+Let me know with a like🙈
+How much do you like it?💕
+Curious about what's next...?✨
+Tell me in the replies💋
+Waiting for your response💕
+Want more?🥺
+Are you satisfied?✨
+Not enough?💋
+What do you want to see next?💕
+Any requests?🙈
+
+# --- Self-promotion ---
+I'm proud of this one💕
+One of my favorites📸
+I really like this one✨
+Even I'm blushing at this💋
+Think I nailed this shot💕
+Today's best🙈
+Went pretty bold this time✨
+Maybe my best ever💕
+Actually satisfied with this one📸
+Came out great💋
+Gonna brag a little💕
+This is a fave✨
+Masterpiece📸
+Even I think I look cute💕
+A little flex💋
+
+# --- Shy vibes ---
+So embarrassing...💕
+Should I really post this?🙈
+Can't stop my heart racing💋
+So nervous...💕
+Never shown this before✨
+Mustered up the courage to post💕
+Blushing so hard🙈
+Knowing you're watching makes me nervous💋
+Embarrassing but look💕
+Posting with a red face✨
+My heart is pounding💕
+Getting nervous🙈
+Look at this quietly💋
+It's a secret...💕
+Would be so embarrassed if someone found out✨
+
+# --- Exclusive vibes ---
+Special treat just for today💕
+Might be a rare post📸
+Something I don't usually show✨
+A precious shot💋
+Limited release💕
+Just between us🙈
+Secretly showing you✨
+Special service💕
+Premium content📸
+Only here can you see this💋
+A rare occasion💕
+Rarely shared🙈
+A special one✨
+Hidden gem💕
+Revealing my best kept secret📸
+
+# --- Building anticipation ---
+There's more where this came from💕
+This isn't the end✨
+The sequel is even better💋
+This is just the beginning💕
+The main event is coming🙈
+The best is yet to come✨
+Haven't even gone all out yet💕
+Next one will be even bolder📸
+Stay tuned💋
+This is just a taste💕
+Tip of the iceberg🙈
+Sequel coming soon✨
+Consider this a teaser💕
+Just a preview📸
+The full version is way better💋
+
+# --- Gratitude ---
+Thanks for always watching💕
+Love everyone who follows✨
+Grateful for every reaction💋
+Thanks for finding me💕
+Love everyone who likes🙈
+Comments make me so happy✨
+Thanks for the support💕
+All thanks to you📸
+I can keep going because of you💋
+So grateful💕
+Posting with gratitude🙈
+A thank you post✨
+With all my appreciation💕
+Love you all📸
+To all my fans💋
+
+# --- Casual ---
+Suddenly felt like taking pics💕
+Random post📸
+Needed a mood change🙈
+Spontaneous shoot✨
+Just killing time💕
+Posted on a whim💋
+Impulsive post💕
+Casually took this📸
+Felt right in the moment✨
+On impulse💕
+Suddenly wanted to shoot🙈
+Surprise drop💋
+No plan at all📸
+Going with the flow💕
+Randomly took this✨
+
+# --- Spicy teasing ---
+Did that make your heart skip?💕
+Viewer discretion advised⚠️✨
+Don't know where to look?💋
+Can you handle this?💕
+Bad for your heart?🙈
+Too much?✨
+Maybe I went too far💕
+Right on the edge📸
+I'm still holding back💋
+If I went all out it'd be even more💕
+I'm being gentle🙈
+This is me being modest✨
+Not even full throttle💕
+Still got reserves📸
+Haven't shown my true power yet💋
+
+# --- Cute vibes ---
+Did I look cute?💕
+Cute me today📸
+Not to brag but I look cute✨
+Cuteness overload💕
+Your cute content provider🙈
+Tell me I'm cute💋
+I'm cute right?💕
+Validate me📸
+Compliment me please✨
+Forcing cuteness on you💕
+Maximum cute mode🙈
+Does this make your heart flutter?💋
+Heart-melting material💕
+Delivering cuteness📸
+Hope this heals you✨
+
+# --- Provocative ---
+You shouldn't look...💕
+You sure you want to see?🙈
+Are you ready?✨
+No turning back💋
+Once you see, it's over💕
+Take responsibility🙈
+Don't say I didn't warn you✨
+At your own risk💕
+Consider yourself warned📸
+Can't stop now💋
+Don't blame me if you want more💕
+Can you resist?🙈
+Can you handle it?✨
+Don't blame me if you're not satisfied💋
+You might get addicted💕
+
+# --- Begging for engagement ---
+Hit that like💕
+Follow me?🥺
+I want your replies✨
+Give me a reaction💋
+If you're watching, react💕
+Don't ignore me🙈
+Don't scroll past✨
+Notice me💕
+Give me attention📸
+I'm lonely💋
+Keep me company💕
+It's lonely without reactions🥺
+Smash that like✨
+Feel free to save💕
+Share this💋
+
+# --- Self-deprecating ---
+Is this okay?💕
+Is there even demand for this?🙈
+Maybe nobody's watching but✨
+Just self-satisfaction💕
+Might be boring📸
+Kinda mid maybe💋
+Might not be great💕
+Sorry if it's bad🙈
+Might lack taste✨
+Sorry it's rough💕
+Sorry for the randomness📸
+Quality might be low💋
+Maybe underwhelming💕
+Nothing special but🙈
+Too basic?✨
+
+# --- High energy ---
+OMG💕💕💕
+This is amazing✨✨
+Getting so hyped💋
+Having too much fun💕
+Can't stop🙈
+Getting carried away✨
+In the zone💕
+On fire📸
+Vibing💋
+LFG💕
+Maximum energy🙈
+The hype is real✨
+So excited💕
+Feeling great📸
+Can't contain myself💋
+
+# --- Cool vibes ---
+Hey💕
+Just look📸
+Anyway✨
+Posting this I guess💕
+Just because🙈
+No particular reason💋
+No deep meaning💕
+Don't read into it📸
+Simply because✨
+Whatever💕
+Casually🙈
+Business as usual💋
+Normal operations💕
+The usual📸
+Regular update✨
+
+# --- Mysterious ---
+It's a secret💕
+Classified🙈
+Can't tell you✨
+Not telling💋
+Between us💕
+Don't ask📸
+No questions allowed✨
+Don't touch💕
+Don't ask me🙈
+Stay quiet💋
+Don't tell anyone💕
+Our little secret📸
+Taking this to the grave✨
+Absolutely secret💕
+Strictly confidential🙈
+
+# --- Teasing ---
+You want to see right?💕
+You want it don't you🙈
+You're curious aren't you✨
+You can't resist can you💋
+You're dying to see right?💕
+Fine I'll show you📸
+Since you insist✨
+You're special💕
+Be grateful🙈
+Appreciate it💋
+You should feel honored💕
+Happy right?📸
+Lucky you✨
+Must be your lucky day💕
+Fortune smiles on you🙈
+
+# --- Talking to myself ---
+Oh, accidentally took this💕
+Was just recording📸
+Didn't realize I was shooting✨
+Can't help but take pics💕
+It's becoming a habit🙈
+Shooting is fun💋
+Maybe getting hooked💕
+Down the rabbit hole📸
+Can't escape✨
+Photography is becoming my hobby💕
+Getting more fun🙈
+It's my daily routine now💋
+Part of my routine💕
+Want to shoot every day📸
+Can't be stopped✨
+
+# --- General/timeless ---
+Today's shot💕
+Today's post📸
+Just took this✨
+Fresh from the camera💕
+Hot off the press🙈
+A fresh one💋
+Brand new💕
+Latest shot📸
+Update✨
+Took a new one💕
+Bonus post🙈
+Second helping💋
+Part two💕
+Follow-up📸
+Breaking news✨
+
+# --- Self-talk ---
+Been into this lately💕
+Love this📸
+One of my faves✨
+Current obsession💕
+Highlight moment🙈
+A carefully crafted shot💋
+Works for me💕
+Personally I like it📸
+Just my opinion✨
+Best one in my book💕
+High self-rating🙈
+Narcissist mode activated💋
+Self-love💕
+High confidence mode📸
+Staying positive✨
+
+# --- Engagement bait ---
+Screenshot this💕
+Save-worthy📸
+Like please✨
+Would love a RT💕
+Share this🙈
+Please spread the word💋
+Would be happy if you share💕
+Show everyone📸
+Let them know✨
+Spread the gospel💕
+Help me promote🙈
+Word of mouth please💋
+Rate me💕
+Waiting for comments📸
+Tell me what you think✨
+
+# --- Aesthetic vibes ---
+Something about this💕
+Great vibes📸
+The aesthetic though✨
+Mood💕
+Love the atmosphere🙈
+The whole vibe💋
+I love this kind of thing💕
+Irresistible📸
+Hits different✨
+Speaks to my soul💕
+Gets me every time🙈
+Slowly sinking in💋
+Resonates💕
+Hits deep📸
+Echoes✨
+
+# --- Playful ---
+Hehe💕
+Oopsie🙈
+Meow✨
+Yay💕
+Woo-hoo📸
+Let's go💋
+Haha💕
+Teehee🙈
+Lol✨
+Eek💕
+Wow📸
+Oops💋
+Oh my💕
+Well well🙈
+Here we go✨
+
+# --- Suggestive ---
+Read between the lines💕
+Think deeper🙈
+You know what I mean✨
+IYKYK💋
+Those who get it, get it💕
+Understand me📸
+Read the room✨
+Feel it💕
+Decode this🙈
+That's what I mean💋
+Exactly what you think💕
+Draw your own conclusions📸
+Use your imagination✨
+Imagine💕
+Let your mind wander🙈

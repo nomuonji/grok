@@ -24,10 +24,12 @@ import tweepy
 import requests
 from datetime import datetime, timedelta, timezone
 from PIL import Image
+from generate_post_text import generate_post_text_gemini
 
 # 設定ファイルのパス
 STATUS_FILE = Path(__file__).parent / "post_status.json"
 TEXTS_FILE = Path(__file__).parent / "post_texts.txt"
+TEXTS_EN_FILE = Path(__file__).parent / "post_texts_en.txt"
 # META_TOKENS_FILE は Gist管理にするため削除
 
 
@@ -75,6 +77,9 @@ def load_env():
     
     # imgBB (Instagram/Threads使用時に必要)
     config["imgbb_api_key"] = os.getenv("IMGBB_API_KEY")
+
+    # Gemini API (投稿文生成用)
+    config["gemini_api_key"] = os.getenv("GEMINI_API_KEY")
 
     # Gist (トークン管理用)
     config["gist_id"] = os.getenv("GIST_ID")
@@ -336,14 +341,17 @@ def get_file_pairs(thumbnails_path: Path, originals_path: Path) -> list[dict]:
     return pairs
 
 
-def load_post_texts() -> list[str]:
+def load_post_texts(file_path: Path = None, default_text: str = "🎬 新着動画プレビュー") -> list[str]:
     """投稿テキストのストックを読み込み"""
-    if not TEXTS_FILE.exists():
-        print(f"警告: {TEXTS_FILE.name} が見つかりません。デフォルトテキストを使用します。")
-        return ["🎬 新着動画プレビュー"]
+    if file_path is None:
+        file_path = TEXTS_FILE
+    
+    if not file_path.exists():
+        print(f"警告: {file_path.name} が見つかりません。デフォルトテキストを使用します。")
+        return [default_text]
     
     texts = []
-    with open(TEXTS_FILE, "r", encoding="utf-8") as f:
+    with open(file_path, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             # 空行とコメント行をスキップ
@@ -351,7 +359,7 @@ def load_post_texts() -> list[str]:
                 texts.append(line)
     
     if not texts:
-        return ["🎬 新着動画プレビュー"]
+        return [default_text]
     
     return texts
 
@@ -400,14 +408,22 @@ def upload_media(api: tweepy.API, file_path: Path, media_type: str = "image") ->
 
 def post_to_x(client: tweepy.Client, api: tweepy.API, 
               thumbnail_path: Path, video_path: Path,
-              thumbnail_text: str = "", video_text: str = "") -> dict:
+              thumbnail_text: str = "", video_text: str = "",
+              community_text: str = "") -> dict:
     """
     サムネイルと動画をXに投稿（1つのツイートにまとめる）
+    + コミュニティにも投稿
     
     Returns:
         投稿結果の辞書
     """
     result = {}
+    
+    # コミュニティIDリスト
+    COMMUNITY_IDS = [
+        "1974877054194553068",
+        "2010978695356219537",
+    ]
     
     # 1. サムネイル画像をアップロード
     print("\n[X 1/2] メディアをアップロード...")
@@ -418,7 +434,7 @@ def post_to_x(client: tweepy.Client, api: tweepy.API,
     video_media_id = upload_media(api, video_path, "video")
     print(f"  動画ID: {video_media_id}")
     
-    # 3. まとめて投稿
+    # 3. メインツイートを投稿
     print("[X 2/2] ツイート投稿...")
     # 画像と動画を同時に添付（Mixed Media）
     response = client.create_tweet(
@@ -430,6 +446,34 @@ def post_to_x(client: tweepy.Client, api: tweepy.API,
     result["thumbnail_tweet_id"] = tweet_id # 互換性のため残す
     
     print(f"  ✓ 投稿完了: https://twitter.com/i/status/{tweet_id}")
+    
+    # 4. コミュニティにも投稿
+    result["community_posts"] = []
+    for community_id in COMMUNITY_IDS:
+        try:
+            print(f"\n[X Community] コミュニティ {community_id} に投稿中...")
+            # コミュニティ投稿用にメディアを再アップロード
+            # （同じmedia_idは別ツイートで再利用できないため）
+            cm_thumbnail_media_id = upload_media(api, thumbnail_path, "image")
+            cm_video_media_id = upload_media(api, video_path, "video")
+            
+            cm_response = client.create_tweet(
+                text=community_text if community_text else thumbnail_text,
+                media_ids=[cm_thumbnail_media_id, cm_video_media_id],
+                community_id=community_id
+            )
+            cm_tweet_id = cm_response.data["id"]
+            result["community_posts"].append({
+                "community_id": community_id,
+                "tweet_id": cm_tweet_id
+            })
+            print(f"  ✓ コミュニティ投稿完了: https://twitter.com/i/status/{cm_tweet_id}")
+        except Exception as e:
+            print(f"  ✗ コミュニティ {community_id} への投稿失敗: {e}")
+            result["community_posts"].append({
+                "community_id": community_id,
+                "error": str(e)
+            })
     
     return result
 
@@ -686,10 +730,30 @@ def main():
     print(f"サムネイル: {next_pair['thumbnail'].name}")
     print(f"動画: {next_pair['video'].name}")
     
-    # 投稿テキストを取得
-    texts = load_post_texts()
-    post_text, text_index = get_next_text(texts, status)
-    print(f"投稿テキスト: {post_text}")
+    # テキストインデックスを取得（英語版と同期用）
+    texts_fallback = load_post_texts()
+    _, text_index = get_next_text(texts_fallback, status)
+    
+    # 日本語投稿テキストをGemini APIで生成
+    post_text = None
+    if config.get("gemini_api_key"):
+        print("\n🤖 Gemini APIで妄想会話テキストを生成中...")
+        post_text = generate_post_text_gemini(
+            api_key=config["gemini_api_key"],
+            text_index=text_index
+        )
+    
+    if not post_text:
+        # フォールバック: 静的テキストファイルを使用
+        print("ℹ️ フォールバック: post_texts.txt を使用")
+        post_text, text_index = get_next_text(texts_fallback, status)
+    
+    print(f"\n投稿テキスト (JP): {post_text}")
+    
+    # コミュニティ用英語テキストを取得
+    texts_en = load_post_texts(TEXTS_EN_FILE, default_text="🎬 New video preview")
+    community_text, _ = get_next_text(texts_en, status)
+    print(f"投稿テキスト (EN/Community): {community_text}")
     
     # 各プラットフォームの投稿結果を記録
     results = {}
@@ -708,7 +772,8 @@ def main():
             next_pair["thumbnail"],
             next_pair["video"],
             thumbnail_text=post_text,
-            video_text=""
+            video_text="",
+            community_text=community_text
         )
         results["x"] = x_result
         
@@ -812,6 +877,12 @@ def main():
         print(f"\n投稿結果:")
         if "x" in results:
             print(f"  ✓ X: https://twitter.com/i/status/{results['x']['thumbnail_tweet_id']}")
+            if results['x'].get('community_posts'):
+                for cp in results['x']['community_posts']:
+                    if 'tweet_id' in cp:
+                        print(f"  ✓ X Community ({cp['community_id']}): https://twitter.com/i/status/{cp['tweet_id']}")
+                    else:
+                        print(f"  ✗ X Community ({cp['community_id']}): {cp.get('error', '不明なエラー')}")
         if "instagram" in results:
             print(f"  ✓ Instagram: media_id={results['instagram']['media_id']}")
         if "threads" in results:
