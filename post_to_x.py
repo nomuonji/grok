@@ -23,8 +23,10 @@ from dotenv import load_dotenv
 import tweepy
 import requests
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from PIL import Image
 from generate_post_text import generate_post_text_gemini
+import tweet_manager
 
 # 設定ファイルのパス
 STATUS_FILE = Path(__file__).parent / "post_status.json"
@@ -869,6 +871,17 @@ def main():
         status["current_index"] = len(status["posted"])
         status["text_index"] = (text_index + 1) % len(texts)
         save_status(status)
+        
+        # tweets.json に追加 (Xのみ)
+        if "x" in results:
+            try:
+                tweet_id = results["x"].get("tweet_id")
+                if tweet_id:
+                    created_at = datetime.now(timezone(timedelta(hours=9))).isoformat()
+                    print(f"  💾 DBに追加: ID={tweet_id}")
+                    tweet_manager.add_tweet(tweet_id, created_at, post_text[:50])
+            except Exception as e:
+                print(f"  ⚠ DB追加失敗: {e}")
         
         print(f"\n{'=' * 50}")
         print(f"=== 投稿完了 ===")

@@ -2,15 +2,21 @@
 X (Twitter) の古い投稿を削除するスクリプト
 
 1回の実行につき、「最も古い投稿」を1つ削除します。
-GitHub Actionsで定期実行（1日5回程度）することで、
-「1日5個ペースで古い投稿が消える」を実現します。
+GitHub Actionsで定期実行（5時間に1回程度）されます。
+
+変更点 (2025/02/20):
+API検索ではなく、ローカルの tweets.json から最古のデータを取得し、
+削除後に tweets.json を更新する方式に変更しました。
 """
 
 import os
 import sys
+import json
 from pathlib import Path
 import tweepy
 from dotenv import load_dotenv
+
+import tweet_manager
 
 # 設定読み込み
 env_path = Path(__file__).parent / ".env"
@@ -38,52 +44,51 @@ def get_twitter_client():
     return client
 
 def delete_oldest_tweet():
-    client = get_twitter_client()
+    # 1. ローカルDBから最古のツイートを取得
+    oldest_data = tweet_manager.get_oldest_tweet()
     
-    # 自分のユーザーIDを取得
-    me = client.get_me()
-    user_id = me.data.id
-    print(f"User ID: {user_id}")
-    
-    # ツイートを取得
-    # 一番古いツイートを見つけるため、ページングして最後まで取得する必要があるが、
-    # API制限を考慮し、ここでは「取得できた範囲の中で最も古いツイート」を対象とする。
-    # max_results=100 で取得し、その中で一番古い（リストの末尾）ものを削除候補とする。
-    # ※ 投稿数が膨大な場合、本当に「一番最初の投稿」ではない可能性があるが、運用上はこれで「古いものから」消えていく。
-    
-    # Paginatorを使ってツイートを取得
-    # limit=None にすると全件取得しようとするが、API制限に注意
-    # ここでは1回の実行につき最大1000件程度まで遡る設定にする
-    tweets = []
-    try:
-        for tweet in tweepy.Paginator(
-            client.get_users_tweets,
-            id=user_id,
-            max_results=100,
-            tweet_fields=["created_at"]
-        ).flatten(limit=1000):
-            tweets.append(tweet)
-    except Exception as e:
-        print(f"ツイート取得エラー: {e}")
+    if not oldest_data:
+        print("tweets.json にデータがありません。削除対象なし。")
         return
 
-    if not tweets:
-        print("削除対象のツイートが見つかりませんでした（投稿数0）。")
-        return
+    tweet_id = oldest_data["id"]
+    created_at = oldest_data.get("created_at", "不明")
+    text = oldest_data.get("text", "")
     
-    # 新しい順に取得されるので、リストの末尾が一番古い
-    oldest_tweet = tweets[-1]
+    print(f"削除対象: ID={tweet_id} (作成日: {created_at})")
+    print(f"内容: {text}")
     
-    print(f"削除対象: {oldest_tweet.id} ({oldest_tweet.created_at})")
-    print(f"内容: {oldest_tweet.text[:30]}...")
-    
-    # 削除実行
+    # 2. APIで削除実行
+    client = get_twitter_client()
     try:
-        client.delete_tweet(oldest_tweet.id)
-        print(f"✓ 削除成功: {oldest_tweet.id}")
-    except Exception as e:
-        print(f"✗ 削除失敗: {e}")
-        sys.exit(1)
+        response = client.delete_tweet(tweet_id)
+        
+        # dataが存在し、deleted: true なら成功
+        # またはエラーにならず完了した場合も成功とみなす
+        if response.data and response.data.get("deleted"):
+            print(f"✓ API削除成功: {tweet_id}")
+            # 3. ローカルDBからも削除
+            tweet_manager.remove_tweet(tweet_id)
+            print(f"✓ tweets.jsonから削除しました（残り: {tweet_manager.get_count()}件）")
+        else:
+            print(f"⚠ APIレスポンス確認: {response}")
+            # delete_tweet は削除成功時に { "deleted": true } を返す
+            if response.data and response.data.get("deleted"):
+                tweet_manager.remove_tweet(tweet_id)
+            else:
+                # 失敗かもしれないが、とりあえずエラーじゃないならスルー？
+                # いや、deleted: false なら失敗
+                pass
+            
+    except tweepy.TweepyException as e:
+        print(f"✗ API例外発生: {e}")
+        # 404 Not FoundならDBから削除（既に消えてる）
+        if "404" in str(e) or "Not Found" in str(e):
+            print("  -> 既に存在しないため、tweets.jsonから削除します。")
+            tweet_manager.remove_tweet(tweet_id)
+        # 403 Forbidden (権限なし) の場合は消さない（解決が必要）
+        else:
+            sys.exit(1)
 
 if __name__ == "__main__":
     delete_oldest_tweet()
