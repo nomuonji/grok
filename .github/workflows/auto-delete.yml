@@ -1,0 +1,38 @@
+name: Auto Delete Old Posts
+
+on:
+  schedule:
+    # 5時間に1回実行（1日約5回削除）
+    # UTC: 0:00, 5:00, 10:00, 15:00, 20:00
+    # JST: 9:00, 14:00, 19:00, 0:00, 5:00
+    - cron: '0 */5 * * *'
+  workflow_dispatch:
+
+jobs:
+  delete-old-post:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install tweepy python-dotenv
+      
+      - name: Create .env file from secrets
+        run: |
+          cat << EOF > .env
+          X_API_KEY=${{ secrets.X_API_KEY }}
+          X_API_SECRET=${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN=${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_TOKEN_SECRET=${{ secrets.X_ACCESS_TOKEN_SECRET }}
+          EOF
+      
+      - name: Run delete script
+        run: python delete_old_posts.py
