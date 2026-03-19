@@ -732,9 +732,12 @@ def main():
     unpaired = [p for p in pairs if p["name"] not in posted_names]
     
     if not unpaired:
-        print("\n全てのファイルが投稿済みです。")
-        print("ステータスをリセットするには post_status.json を削除してください。")
-        return
+        print("\n全てのファイルが投稿済みです。リセットして最初から投稿を開始します。")
+        status["posted"] = []
+        status["current_index"] = 0
+        save_status(status)
+        unpaired = pairs
+
     
     print(f"未投稿: {len(unpaired)}セット")
     
