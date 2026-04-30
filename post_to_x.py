@@ -451,31 +451,31 @@ def post_to_x(client: tweepy.Client, api: tweepy.API,
     
     # 4. コミュニティにも投稿
     result["community_posts"] = []
-    for community_id in COMMUNITY_IDS:
-        try:
-            print(f"\n[X Community] コミュニティ {community_id} に投稿中...")
-            # コミュニティ投稿用にメディアを再アップロード
-            # （同じmedia_idは別ツイートで再利用できないため）
-            cm_thumbnail_media_id = upload_media(api, thumbnail_path, "image")
-            cm_video_media_id = upload_media(api, video_path, "video")
-            
-            cm_response = client.create_tweet(
-                text=community_text if community_text else thumbnail_text,
-                media_ids=[cm_thumbnail_media_id, cm_video_media_id],
-                community_id=community_id
-            )
-            cm_tweet_id = cm_response.data["id"]
-            result["community_posts"].append({
-                "community_id": community_id,
-                "tweet_id": cm_tweet_id
-            })
-            print(f"  ✓ コミュニティ投稿完了: https://twitter.com/i/status/{cm_tweet_id}")
-        except Exception as e:
-            print(f"  ✗ コミュニティ {community_id} への投稿失敗: {e}")
-            result["community_posts"].append({
-                "community_id": community_id,
-                "error": str(e)
-            })
+    # for community_id in COMMUNITY_IDS:
+    #     try:
+    #         print(f"\n[X Community] コミュニティ {community_id} に投稿中...")
+    #         # コミュニティ投稿用にメディアを再アップロード
+    #         # （同じmedia_idは別ツイートで再利用できないため）
+    #         cm_thumbnail_media_id = upload_media(api, thumbnail_path, "image")
+    #         cm_video_media_id = upload_media(api, video_path, "video")
+    #         
+    #         cm_response = client.create_tweet(
+    #             text=community_text if community_text else thumbnail_text,
+    #             media_ids=[cm_thumbnail_media_id, cm_video_media_id],
+    #             community_id=community_id
+    #         )
+    #         cm_tweet_id = cm_response.data["id"]
+    #         result["community_posts"].append({
+    #             "community_id": community_id,
+    #             "tweet_id": cm_tweet_id
+    #         })
+    #         print(f"  ✓ コミュニティ投稿完了: https://twitter.com/i/status/{cm_tweet_id}")
+    #     except Exception as e:
+    #         print(f"  ✗ コミュニティ {community_id} への投稿失敗: {e}")
+    #         result["community_posts"].append({
+    #             "community_id": community_id,
+    #             "error": str(e)
+    #         })
     
     return result
 
